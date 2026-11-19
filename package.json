@@ -1,0 +1,89 @@
+{
+  "name": "dont-blink",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A horror game that only moves when you blink. Live blink, pulse and expression signals from the Presage SmartSpectra SDK.",
+  "main": "main.js",
+  "scripts": {
+    "build": "esbuild src/renderer.js --bundle --outfile=dist/renderer.bundle.js --platform=browser --format=iife --log-level=warning",
+    "start": "npm run build && electron .",
+    "test": "node --test test/*.test.js",
+    "dist:mac": "npm run build && electron-builder --mac --arm64",
+    "dist:win": "npm run build && electron-builder --win --x64",
+    "dist:linux": "npm run build && electron-builder --linux --x64",
+    "dist:all": "npm run dist:mac && npm run dist:win && npm run dist:linux"
+  },
+  "dependencies": {
+    "@smartspectra/node-sdk": "3.5.0"
+  },
+  "devDependencies": {
+    "electron": "43.8.1",
+    "electron-builder": "^26.6.0",
+    "esbuild": "^0.25.0"
+  },
+  "overrides": {
+    "js-yaml": "4.3.2",
+    "fast-uri": "3.1.9",
+    "@xmldom/xmldom": "0.8.15",
+    "node-gyp": {
+      "undici": "6.29.1"
+    },
+    "@electron/get": {
+      "undici": "7.30.1"
+    },
+    "minimatch@^9.0.0 || ^10.0.0": "11.0.1"
+  },
+  "build": {
+    "appId": "com.vibeshipyard.dontblink",
+    "productName": "Don't Blink",
+    "files": [
+      "main.js",
+      "index.html",
+      "styles.css",
+      "assets/**",
+      "dist/**",
+      "node_modules/**",
+      "!node_modules/@smartspectra/node-sdk-*/**",
+      "!node_modules/@smartspectra/node-sdk/scripts/**",
+      "!node_modules/@smartspectra/node-sdk/test/**",
+      "!node_modules/@smartspectra/node-sdk/samples/**",
+      "!node_modules/@smartspectra/node-sdk/prebuilds/**"
+    ],
+    "mac": {
+      "category": "public.app-category.games",
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSCameraUsageDescription": "Don't Blink uses the camera on this computer to read blinks, pulse and expressions with the SmartSpectra SDK. Nothing is recorded or uploaded."
+      },
+      "extraResources": [
+        {
+          "from": "node_modules/@smartspectra/node-sdk-darwin-${arch}/",
+          "to": "smartspectra"
+        }
+      ]
+    },
+    "win": {
+      "target": "nsis",
+      "extraResources": [
+        {
+          "from": "node_modules/@smartspectra/node-sdk-win32-${arch}/",
+          "to": "smartspectra"
+        }
+      ]
+    },
+    "linux": {
+      "target": "AppImage",
+      "extraResources": [
+        {
+          "from": "node_modules/@smartspectra/node-sdk-linux-${arch}/",
+          "to": "smartspectra"
+        }
+      ]
+    },
+    "asar": true
+  },
+  "license": "SEE LICENSE IN LICENSE",
+  "author": "Safwaan Uddin"
+}

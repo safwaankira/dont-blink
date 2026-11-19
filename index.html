@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self'">
+<title>Don't Blink</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<canvas id="stage"></canvas>
+
+<!-- HUD: shown during play -->
+<div id="hud" hidden>
+  <div id="hud-top">
+    <div id="dawn"><span class="lbl">DAWN IN</span> <span id="dawn-time">1:00</span></div>
+    <div id="mode-badge" class="badge live">LIVE · SmartSpectra</div>
+  </div>
+  <div id="cam-box">
+    <video id="preview" autoplay muted playsinline></video>
+    <div id="cam-label">your camera · on this computer only</div>
+  </div>
+  <div id="readouts">
+    <div class="ro"><span class="ro-v" id="ro-pulse">—</span><span class="ro-l">pulse bpm</span></div>
+    <div class="ro"><span class="ro-v" id="ro-breath">—</span><span class="ro-l">breaths / min</span></div>
+    <div class="ro"><span class="ro-v" id="ro-blinks">0</span><span class="ro-l">blinks</span></div>
+    <div class="ro"><span class="ro-v" id="ro-dist">100</span><span class="ro-l">metres away</span></div>
+  </div>
+  <canvas id="strip" width="420" height="60"></canvas>
+  <div id="smile-meter"><div id="smile-fill"></div><span>smile to push it back</span></div>
+  <div id="hint"></div>
+  <div id="toast"></div>
+</div>
+
+<!-- Calibration -->
+<div id="calib" class="overlay center" hidden>
+  <h2>Look at the candle.</h2>
+  <p class="big">Blink <b>twice</b> to light it.</p>
+  <p id="calib-status" class="muted">Reading your pulse…</p>
+  <p class="muted small">Then keep your eyes open. It only moves when you blink.</p>
+</div>
+
+<!-- Consent: nothing touches the camera before this -->
+<div id="consent" class="overlay">
+  <div class="card">
+    <h1>DON'T BLINK</h1>
+    <p class="tag">It only moves when you blink. Your heartbeat makes it faster. A real smile pushes it back.</p>
+    <h3>Before the camera turns on</h3>
+    <ul class="facts">
+      <li><b>What it reads:</b> blinks, pulse, breathing, talking and facial expression, from your camera, with the Presage SmartSpectra SDK running on this computer.</li>
+      <li><b>What it keeps:</b> nothing. No video, image or vital sign is saved or sent anywhere. Numbers live in memory for one round and are gone when you close the window.</li>
+      <li><b>Network:</b> the SDK contacts Presage only to check the API key. Presage's usage telemetry (no video, no vitals) is <b>off</b> unless you tick the box below.</li>
+      <li><b>Not medical:</b> this is a game. The numbers are not a health reading.</li>
+      <li><b>Heads-up:</b> dark scenes, sudden sounds and one jump scare at the end. Gentle mode removes the scare.</li>
+    </ul>
+    <label class="opt"><input type="checkbox" id="opt-gentle"> Gentle mode (no jump scare)</label>
+    <label class="opt"><input type="checkbox" id="opt-telemetry"> Share Presage SDK usage telemetry (optional)</label>
+    <div id="key-row" hidden>
+      <label for="api-key">Presage API key (kept in memory only)</label>
+      <input id="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="paste your SmartSpectra key">
+    </div>
+    <div class="btns">
+      <button id="btn-live" class="primary">Allow camera and play</button>
+      <button id="btn-practice">Practice with keys (no camera)</button>
+    </div>
+    <p class="muted small">You can stop at any time with <kbd>Esc</kbd>, which turns the camera off.</p>
+  </div>
+</div>
+
+<!-- End card -->
+<div id="end" class="overlay center" hidden>
+  <canvas id="card" width="1200" height="630"></canvas>
+  <div class="btns">
+    <button id="btn-again" class="primary">Play again</button>
+    <button id="btn-save">Save this card</button>
+    <button id="btn-quit">Turn camera off</button>
+  </div>
+  <p class="muted small">The card shows numbers only, never your face. Saving writes one PNG where you choose.</p>
+</div>
+
+<div id="error" class="overlay center" hidden>
+  <h2>The candle went out.</h2>
+  <p id="error-msg" class="muted"></p>
+  <div class="btns"><button id="btn-error-practice">Practice with keys</button><button id="btn-error-back">Back</button></div>
+</div>
+
+<script src="dist/renderer.bundle.js"></script>
+</body>
+</html>
