@@ -153,7 +153,7 @@ function beginRound() {
 
 function handleEvents() {
     for (const ev of game.drain()) {
-        if (ev.type === 'candle') { scene.candle = ev.lit; sound.chime(); }
+        if (ev.type === 'candle') { scene.candle = Math.min(2, ev.lit); if (ev.lit <= 2) sound.chime(); }
         if (ev.type === 'hunt') { $('calib').hidden = true; toast('Keep your eyes open.'); }
         if (ev.type === 'moved') { scene.moved(1 - ev.to / 100); sound.step(1 - ev.to / 100); }
         if (ev.type === 'recoil') { scene.recoil = 1; sound.hiss(); toast('It flinched.'); }
@@ -206,7 +206,7 @@ function calibText() {
     const pulse = game.pulse != null ? `Pulse ${Math.round(game.pulse)} bpm. ` : (mode === 'live' ? 'Finding your pulse… ' : '');
     const nudge = game.calBlinks < 2 && game.elapsedMs > 9000 ? ' Blink slowly and fully.' : '';
     const press = mode === 'practice' && game.calBlinks < 2 ? ' Press Space to blink.' : '';
-    return `${pulse}Candle ${game.calBlinks}/2.${press}${nudge}`;
+    return `${pulse}Candle ${Math.min(2, game.calBlinks)}/2.${press}${nudge}`;
 }
 
 function drawStrip() {
@@ -226,6 +226,7 @@ function drawStrip() {
 }
 
 function frame(now) {
+    requestAnimationFrame(frame); // schedule first: one bad frame must never stop the game
     const dt = Math.min(100, now - last); last = now;
     if (running) {
         if (mode === 'practice') practiceTick(dt);
@@ -240,8 +241,7 @@ function frame(now) {
         if (game.phase === 'calibrate') $('calib-status').textContent = calibText();
         drawStrip();
     }
-    scene.draw(dt, game);
-    requestAnimationFrame(frame);
+    try { scene.draw(dt, game); } catch (e) { console.error('[dont-blink] draw', e); }
 }
 requestAnimationFrame(frame);
 

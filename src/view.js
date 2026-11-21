@@ -174,13 +174,13 @@ class Scene {
     }
 
     resize() {
-        const r = Math.min(2, window.devicePixelRatio || 1);
+        const r = 1; // big canvases at 2x cost more than they show
         this.w = this.c.clientWidth; this.h = this.c.clientHeight;
         this.c.width = Math.round(this.w * r); this.c.height = Math.round(this.h * r);
         this.g.setTransform(r, 0, 0, r, 0, 0);
         this.r = r;
         this.cx = this.w / 2; this.cy = this.h * 0.44;
-        this.hall = this.buildHall();
+        this.hall = this.buildHall(); this.vign = null; this.grainPat = null;
     }
 
     // Screen rectangle of the hall's cross-section at depth d (0 = you).
@@ -279,6 +279,11 @@ class Scene {
         const dw = (far.r - far.l) * 0.5, dh = (far.b - far.t) * 0.8;
         g.fillStyle = '#000'; g.fillRect(this.cx - dw / 2, far.b - dh, dw, dh);
         g.strokeStyle = 'rgba(150,110,60,0.35)'; g.strokeRect(this.cx - dw / 2, far.b - dh, dw, dh);
+        // depth fog toward the far end, baked in (it never changes)
+        const fc = (far.t + far.b) / 2;
+        const fog = g.createRadialGradient(this.cx, fc, 4, this.cx, fc, this.w * 0.45);
+        fog.addColorStop(0, 'rgba(0,0,0,0.92)'); fog.addColorStop(0.45, 'rgba(0,0,0,0.6)'); fog.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = fog; g.fillRect(0, 0, this.w, this.h);
         return c;
         function lerp2(a, b, m) { return { t: lerp(a.t, b.t, m), b: lerp(a.b, b.b, m) }; }
     }
@@ -299,7 +304,7 @@ class Scene {
 
         const near = 1 - this.shownDistance / 100;
         const flick = 0.82 + 0.1 * Math.sin(now / 83) * Math.sin(now / 31) + 0.06 * Math.sin(now / 7) + 0.07 * this.breath;
-        const lit = state.phase === 'calibrate' ? [0.15, 0.55, 1][this.candle] : 1;
+        const lit = state.phase === 'calibrate' ? [0.15, 0.55, 1][clamp(this.candle | 0, 0, 2)] : 1;
         const light = lit * flick;
 
         g.save();
@@ -307,17 +312,9 @@ class Scene {
         // the hall sways a little with your breathing
         g.translate(0, this.breath * 2);
         g.fillStyle = '#000'; g.fillRect(-20, -20, w + 40, h + 40);
-        g.drawImage(this.hall, 0, 0, w, h);
+        const amb = clamp(0.62 - 0.22 * light, 0.35, 0.92) + (state.phase === 'calibrate' ? 0.3 * (1 - lit) : 0);
+        g.globalAlpha = clamp(1 - amb, 0.03, 1); g.drawImage(this.hall, 0, 0, w, h); g.globalAlpha = 1;
 
-        // depth fog toward the far end
-        const far = this.frame(FAR);
-        const fog = g.createRadialGradient(cx, (far.t + far.b) / 2, 4, cx, (far.t + far.b) / 2, w * 0.45);
-        fog.addColorStop(0, 'rgba(0,0,0,0.92)'); fog.addColorStop(0.45, 'rgba(0,0,0,0.6)'); fog.addColorStop(1, 'rgba(0,0,0,0)');
-        g.fillStyle = fog; g.fillRect(0, 0, w, h);
-
-        // ambient: the hall only exists as far as your candle reaches
-        g.fillStyle = `rgba(0,0,0,${clamp(0.62 - 0.22 * light, 0.35, 0.92) + (state.phase === 'calibrate' ? 0.3 * (1 - lit) : 0)})`;
-        g.fillRect(-20, -20, w + 40, h + 40);
         if (state.phase !== 'calibrate' && !this.settled) this.drawCreature(near, light);
 
         // candle light: everything outside its reach falls into black
@@ -325,9 +322,9 @@ class Scene {
         const dark = g.createRadialGradient(cx, by - 60, reach * 0.05, cx, by - 140, reach);
         dark.addColorStop(0, 'rgba(0,0,0,0)'); dark.addColorStop(0.35, `rgba(0,0,0,${0.35 - 0.2 * light})`); dark.addColorStop(1, 'rgba(0,0,0,0.98)');
         g.fillStyle = dark; g.fillRect(-20, -20, w + 40, h + 40);
-        g.globalCompositeOperation = 'overlay';
+        g.globalCompositeOperation = 'lighter';
         const warm = g.createRadialGradient(cx, by - 80, 0, cx, by - 80, reach * 0.7);
-        warm.addColorStop(0, `rgba(255,150,60,${0.45 * light})`); warm.addColorStop(1, 'rgba(255,120,40,0)');
+        warm.addColorStop(0, `rgba(120,60,20,${0.35 * light})`); warm.addColorStop(1, 'rgba(255,120,40,0)');
         g.fillStyle = warm; g.fillRect(0, 0, w, h);
         g.globalCompositeOperation = 'source-over';
         this.drawCandle(cx, by, light, state.phase === 'calibrate' ? this.candle > 0 : true);
@@ -348,13 +345,15 @@ class Scene {
         this.drawLids();
 
         // film grain and a hard vignette, always on top
-        g.globalAlpha = 0.07; g.globalCompositeOperation = 'overlay';
-        const gr = this.grain[(now / 50 | 0) % 4], ox = (Math.random() * 256) | 0, oy = (Math.random() * 256) | 0;
-        for (let x = -ox; x < w; x += 256) for (let y = -oy; y < h; y += 256) g.drawImage(gr, x, y);
+        g.globalAlpha = 0.045;
+        if (!this.grainPat) this.grainPat = this.grain.map((c) => g.createPattern(c, 'repeat'));
+        g.fillStyle = this.grainPat[(now / 60 | 0) % 4]; g.fillRect(0, 0, w, h);
         g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
-        const vg = g.createRadialGradient(cx, h / 2, Math.min(w, h) * 0.35, cx, h / 2, Math.max(w, h) * 0.75);
-        vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.75)');
-        g.fillStyle = vg; g.fillRect(0, 0, w, h);
+        if (!this.vign) {
+            const vg = g.createRadialGradient(cx, h / 2, Math.min(w, h) * 0.35, cx, h / 2, Math.max(w, h) * 0.75);
+            vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.75)'); this.vign = vg;
+        }
+        g.fillStyle = this.vign; g.fillRect(0, 0, w, h);
     }
 
     // Eyelids: close fast, hold, open — the pose changes while they're shut.
@@ -417,7 +416,6 @@ class Scene {
         const armUp = R() > 0.55, reachSide = R() > 0.5 ? 1 : -1;
         g.save(); g.translate(x, baseY); g.rotate(lean * 0.25);
         g.globalAlpha = clamp(fogA * (0.5 + 0.6 * light), 0, 1);
-        if (d > FAR * 0.45) g.filter = 'blur(1px)';
 
         const robe = g.createLinearGradient(0, 0, 0, -H);
         robe.addColorStop(0, `rgb(${68 + 50 * near},${44 + 22 * near},30)`); robe.addColorStop(0.5, '#140e0b'); robe.addColorStop(1, '#060404');
@@ -478,7 +476,6 @@ class Scene {
         }
         g.restore();
         g.restore();
-        g.filter = 'none';
     }
 
     drawScare(cx, cy) {
