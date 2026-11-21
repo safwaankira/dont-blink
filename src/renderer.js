@@ -20,7 +20,23 @@ let apiKey = params.get('k') || '';
 if (params.has('k')) history.replaceState(null, '', location.pathname); // don't keep it in the URL
 if (!apiKey) $('key-row').hidden = false;
 
-const VALIDATION_NAMES = Object.fromEntries(Object.entries(ValidationCode).map(([k, v]) => [v, k.replace(/^k/, '')]));
+// Camera hints in the game's voice. Chest framing only affects the breathing
+// trace (the candle sway), so it is never worth interrupting play for.
+const HINTS = {
+    [ValidationCode.kNoFaceFound]: "It can't see your face.",
+    [ValidationCode.kMultipleFacesFound]: 'Only one of you can play.',
+    [ValidationCode.kFaceNotCentered]: 'Sit in the middle of the camera.',
+    [ValidationCode.kFaceTooClose]: 'Lean back a little.',
+    [ValidationCode.kFaceTooFar]: 'Come closer to the camera.',
+    [ValidationCode.kFaceTooHigh]: 'Lower your camera or sit up less.',
+    [ValidationCode.kFaceTooLow]: 'Raise your camera a little.',
+    [ValidationCode.kFaceNotForward]: 'Look straight at the screen.',
+    [ValidationCode.kTooDark]: 'Too dark: light your face from the front.',
+    [ValidationCode.kTooBright]: 'Too bright behind or on you.',
+    [ValidationCode.kExcessiveMotion]: 'Hold still.',
+    [ValidationCode.kFrameRateTooLow]: 'The camera is running slowly.',
+};
+let gotMetrics = false;
 
 const scene = new Scene($('stage'));
 const sound = new Sound();
@@ -55,6 +71,7 @@ async function startLive() {
     if (!apiKey) apiKey = $('api-key').value.trim();
     if (!apiKey) { $('api-key').focus(); $('api-key').placeholder = 'a Presage API key is needed for live play'; return; }
     mode = 'live';
+    gotMetrics = false;
     beginRound();
     sdk = new SmartSpectraSDK({
         apiKey,
@@ -63,10 +80,11 @@ async function startLive() {
         enableTelemetry: $('opt-telemetry').checked,
     });
     sdk.on('metrics', (buf) => {
+        gotMetrics = true;
         try { reader.feed(decodeMetrics(buf)); } catch (e) { console.error('[dont-blink] decode failed', e); }
     });
     sdk.on('validationStatus', (code, _ts, hint) => {
-        $('hint').textContent = code === ValidationCode.kOk ? '' : (hint || VALIDATION_NAMES[code] || '');
+        $('hint').textContent = HINTS[code] || '';
     });
     sdk.on('processingStatus', (s) => { if (s === ProcessingStatus.kError) showError('The SDK stopped. Check the light and your key, then try again.'); });
     sdk.on('error', (code, message) => showError(`SmartSpectra error ${code}: ${message}`));
@@ -137,7 +155,7 @@ function handleEvents() {
     for (const ev of game.drain()) {
         if (ev.type === 'candle') { scene.candle = ev.lit; sound.chime(); }
         if (ev.type === 'hunt') { $('calib').hidden = true; toast('Keep your eyes open.'); }
-        if (ev.type === 'moved') { scene.moved(); sound.step(1 - ev.to / 100); }
+        if (ev.type === 'moved') { scene.moved(1 - ev.to / 100); sound.step(1 - ev.to / 100); }
         if (ev.type === 'recoil') { scene.recoil = 1; sound.hiss(); toast('It flinched.'); }
         if (ev.type === 'caught') caught(ev);
         if (ev.type === 'dawn') dawn(ev);
@@ -156,7 +174,7 @@ function caught(summary) {
     anim();
 }
 
-function dawn(summary) { running = false; toast('Dawn.'); setTimeout(() => showEnd(summary), 2600); }
+function dawn(summary) { running = false; $('hud').hidden = true; sound.dawn(); toast('Dawn.'); setTimeout(() => showEnd(summary), 3200); }
 
 function showEnd(s) {
     scene.settled = true;
@@ -183,6 +201,14 @@ function toast(text) {
     clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 1600);
 }
 
+function calibText() {
+    if (mode === 'live' && !gotMetrics) return 'Waking the camera…';
+    const pulse = game.pulse != null ? `Pulse ${Math.round(game.pulse)} bpm. ` : (mode === 'live' ? 'Finding your pulse… ' : '');
+    const nudge = game.calBlinks < 2 && game.elapsedMs > 9000 ? ' Blink slowly and fully.' : '';
+    const press = mode === 'practice' && game.calBlinks < 2 ? ' Press Space to blink.' : '';
+    return `${pulse}Candle ${game.calBlinks}/2.${press}${nudge}`;
+}
+
 function drawStrip() {
     const c = $('strip'), g = c.getContext('2d'), w = c.width, h = c.height;
     g.clearRect(0, 0, w, h);
@@ -196,7 +222,7 @@ function drawStrip() {
     };
     line(strip.breath, 'rgba(224,192,106,0.8)', true);
     line(strip.pulse, 'rgba(230,80,70,0.95)', false);
-    g.fillStyle = '#8d8473'; g.font = '10px sans-serif'; g.fillText('pulse wave', 4, 11); g.fillStyle = '#b39a5a'; g.fillText('breath', 70, 11);
+    g.font = '10px sans-serif'; g.fillStyle = '#e5574a'; g.fillText('pulse wave', 8, 13); g.fillStyle = '#c9a25e'; g.fillText('breath', 72, 13);
 }
 
 function frame(now) {
@@ -211,7 +237,7 @@ function frame(now) {
         sound.setDread(1 - game.distance / 100);
         const cd = game.smileCooldownLeft();
         $('smile-fill').style.width = cd > 0 ? `${100 * (1 - cd / game.cfg.smileCooldownMs)}%` : `${Math.min(100, smileNow)}%`;
-        if (game.phase === 'calibrate' && game.pulse != null) $('calib-status').textContent = `Pulse found: ${Math.round(game.pulse)} bpm. Candle ${game.calBlinks}/2.`;
+        if (game.phase === 'calibrate') $('calib-status').textContent = calibText();
         drawStrip();
     }
     scene.draw(dt, game);
@@ -222,29 +248,61 @@ requestAnimationFrame(frame);
 // ---------- end card (numbers only, never the camera image) ----------
 function drawCard(c, s, how) {
     const g = c.getContext('2d'), W = c.width, H = c.height;
-    const bg = g.createRadialGradient(W / 2, H * 1.1, 50, W / 2, H / 2, W * 0.8);
-    bg.addColorStop(0, s.outcome === 'dawn' ? '#5a4a30' : '#3a0d08'); bg.addColorStop(1, '#050404');
+    const dawnWin = s.outcome === 'dawn';
+    const bg = g.createRadialGradient(W / 2, H * 1.15, 40, W / 2, H * 0.4, W * 0.85);
+    bg.addColorStop(0, dawnWin ? '#6a5534' : '#4a0f09'); bg.addColorStop(1, '#060404');
     g.fillStyle = bg; g.fillRect(0, 0, W, H);
-    g.fillStyle = '#f2e6cf'; g.textAlign = 'center';
-    g.font = '400 30px Georgia, serif'; g.fillText("D O N ' T   B L I N K", W / 2, 70);
-    g.font = '400 76px Georgia, serif';
-    g.fillText(s.outcome === 'dawn' ? 'You saw dawn.' : `It got you at ${fmt(s.survivedSec)}.`, W / 2, 190);
+    g.textAlign = 'left'; g.fillStyle = '#a89a80';
+    g.font = '400 20px Georgia, serif'; g.fillText("D O N ' T   B L I N K", 60, 64);
+    g.fillStyle = '#f2e6cf'; g.font = '400 62px Georgia, serif';
+    g.fillText(dawnWin ? 'You saw dawn.' : `You lasted ${fmt(s.survivedSec)}.`, 60, 140);
+    g.fillStyle = '#d9c9a8'; g.font = 'italic 24px Georgia, serif';
+    g.fillText(dawnWin ? `It moved ${s.blinks} times and never reached you.` : `It reached you on blink ${s.blinks}.`, 60, 182);
+
     const stats = [
         [String(s.blinks), 'blinks'],
-        [s.baseline != null ? String(s.baseline) : '—', 'resting pulse'],
-        [s.peakPulse != null ? String(s.peakPulse) : '—', 'peak pulse'],
-        [String(s.smiles), 'smiles that saved you'],
+        [s.baseline != null ? String(s.baseline) : '—', 'resting bpm'],
+        [s.peakPulse != null ? String(s.peakPulse) : '—', 'peak bpm'],
+        [String(s.smiles), s.smiles === 1 ? 'smile saved you' : 'smiles saved you'],
     ];
     stats.forEach(([v, l], i) => {
-        const x = W * (0.14 + i * 0.24);
-        g.font = '400 64px Georgia, serif'; g.fillStyle = '#f2e6cf'; g.fillText(v, x, 340);
-        g.font = '400 22px Georgia, serif'; g.fillStyle = '#a89a80'; g.fillText(l, x, 378);
+        const x = 60 + i * 150;
+        g.fillStyle = '#f2e6cf'; g.font = '400 44px Georgia, serif'; g.fillText(v, x, 260);
+        g.fillStyle = '#a89a80'; g.font = '400 16px Georgia, serif'; g.fillText(l, x, 286);
     });
-    g.font = 'italic 24px Georgia, serif'; g.fillStyle = '#d9c9a8';
-    const line = s.outcome === 'dawn' ? 'It never reached you.' : `Every blink, it moved. ${s.blinks} times.`;
-    g.fillText(line, W / 2, 470);
-    g.font = '18px sans-serif'; g.fillStyle = '#7d7466';
-    g.fillText(how === 'live' ? 'Live signals: Presage SmartSpectra SDK, on-device' : 'Practice round: simulated signals', W / 2, H - 40);
+
+    // Your pulse across the round, with a tick for every blink.
+    const X0 = 60, X1 = W - 60, Y0 = 340, Y1 = H - 90;
+    const dur = Math.max(1000, s.durationMs || 1);
+    const pts = s.timeline || [];
+    const vals = pts.map((p) => p.bpm).concat(s.baseline != null ? [s.baseline] : []);
+    const lo = Math.floor((Math.min(...vals, 70) - 5) / 5) * 5, hi = Math.ceil((Math.max(...vals, 90) + 5) / 5) * 5;
+    const xOf = (t) => X0 + (t / dur) * (X1 - X0), yOf = (b) => Y1 - ((b - lo) / (hi - lo)) * (Y1 - Y0);
+    g.strokeStyle = 'rgba(168,154,128,0.25)'; g.lineWidth = 1;
+    g.fillStyle = '#7d7466'; g.font = '14px sans-serif'; g.textAlign = 'right';
+    for (const b of [lo, Math.round((lo + hi) / 2), hi]) { g.beginPath(); g.moveTo(X0, yOf(b)); g.lineTo(X1, yOf(b)); g.stroke(); g.fillText(String(b), X0 - 8, yOf(b) + 5); }
+    g.textAlign = 'left';
+    if (s.baseline != null) {
+        g.setLineDash([4, 6]); g.strokeStyle = 'rgba(217,201,168,0.5)';
+        g.beginPath(); g.moveTo(X0, yOf(s.baseline)); g.lineTo(X1, yOf(s.baseline)); g.stroke(); g.setLineDash([]);
+        g.fillStyle = '#a89a80'; g.fillText('your resting pulse', X0 + 6, yOf(s.baseline) - 6);
+    }
+    g.strokeStyle = 'rgba(232,215,180,0.35)';
+    for (const t of s.moves || []) { g.beginPath(); g.moveTo(xOf(t), Y1); g.lineTo(xOf(t), Y1 - 12); g.stroke(); }
+    if (pts.length > 1) {
+        g.strokeStyle = '#e5574a'; g.lineWidth = 3; g.lineJoin = 'round'; g.beginPath();
+        pts.forEach((p, i) => (i ? g.lineTo(xOf(p.t), yOf(p.bpm)) : g.moveTo(xOf(p.t), yOf(p.bpm)))); g.stroke();
+        const peak = pts.reduce((a, b) => (b.bpm > a.bpm ? b : a));
+        g.fillStyle = '#e5574a'; g.beginPath(); g.arc(xOf(peak.t), yOf(peak.bpm), 6, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#f2e6cf'; g.font = '15px sans-serif';
+        const lx = Math.min(xOf(peak.t) + 10, X1 - 90);
+        g.fillText(`peak ${Math.round(peak.bpm)}`, lx, Math.max(Y0 + 4, yOf(peak.bpm) - 10));
+    }
+    g.fillStyle = '#7d7466'; g.font = '14px sans-serif';
+    g.fillText('pulse during the round  ·  ticks = blinks', X0, Y1 + 26);
+    g.textAlign = 'right';
+    g.fillText(how === 'live' ? 'live signals · Presage SmartSpectra SDK, on-device' : 'practice round · simulated signals', X1, Y1 + 26);
+    g.textAlign = 'left';
 }
 function fmt(sec) { return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`; }
 

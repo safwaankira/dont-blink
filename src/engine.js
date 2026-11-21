@@ -48,6 +48,8 @@ class Game {
         this.calBlinks = 0;
         this.smiles = 0;
         this.pulseSamples = [];
+        this.timeline = [];      // {t, bpm} during the hunt, for the end card
+        this.secondBlinkAt = null;
         this.calPulse = [];
         this.baseline = null;
         this.pulse = null;
@@ -84,6 +86,7 @@ class Game {
         if (this.phase === 'calibrate') this.calPulse.push(bpm);
         if (this.phase === 'hunt') {
             this.pulseSamples.push(bpm);
+            this.timeline.push({ t: this.huntMs, bpm });
             this.peakPulse = this.peakPulse == null ? bpm : Math.max(this.peakPulse, bpm);
         }
     }
@@ -94,6 +97,7 @@ class Game {
         this.blinks++;
         if (this.phase === 'calibrate') {
             this.calBlinks++;
+            if (this.calBlinks === 2) this.secondBlinkAt = this.elapsedMs;
             this.emit('candle', { lit: this.calBlinks });
             return true;
         }
@@ -133,8 +137,11 @@ class Game {
     tick(dtMs) {
         this.elapsedMs += dtMs;
         if (this.phase === 'calibrate') {
-            const enoughPulse = this.calPulse.length >= 3;
-            if ((this.calBlinks >= 2 && enoughPulse) || this.elapsedMs > 25000) this.startHunt();
+            // Start as soon as both candles are lit and we have any pulse; if the
+            // pulse is slow to arrive, wait at most 4 s more, then use a default.
+            const lit = this.calBlinks >= 2;
+            const waited = lit && this.elapsedMs - this.secondBlinkAt > 4000;
+            if ((lit && (this.calPulse.length >= 1 || waited)) || this.elapsedMs > 20000) this.startHunt();
             return;
         }
         if (this.phase !== 'hunt') return;
@@ -165,6 +172,9 @@ class Game {
             avgPulse: avg != null ? Math.round(avg) : null,
             peakPulse: this.peakPulse != null ? Math.round(this.peakPulse) : null,
             closest: Math.round(this.distance),
+            timeline: this.timeline.slice(),
+            moves: this.moves.map((m) => m.at),
+            durationMs: this.huntMs,
         };
     }
 

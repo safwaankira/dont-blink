@@ -17,8 +17,8 @@ test('two blinks plus a pulse end calibration and set the baseline', () => {
     assert.strictEqual(g.distance, 100, 'calibration blinks do not move it');
 });
 
-test('calibration gives up waiting after 25 s', () => {
-    const g = new Game(); g.tick(25001);
+test('calibration gives up waiting after 20 s', () => {
+    const g = new Game(); g.tick(20001);
     assert.strictEqual(g.phase, 'hunt'); assert.strictEqual(g.baseline, 75);
 });
 
@@ -73,4 +73,17 @@ test('surviving 60 s is dawn', () => {
 test('junk pulse values are ignored', () => {
     const g = new Game(); g.onPulse(0); g.onPulse(NaN); g.onPulse(400);
     assert.strictEqual(g.pulse, null);
+});
+
+test('two blinks with no pulse yet start the hunt after 4 s', () => {
+    const g = new Game();
+    g.tick(300); g.onBlink(g.elapsedMs); g.tick(300); g.onBlink(g.elapsedMs);
+    g.tick(1000); assert.strictEqual(g.phase, 'calibrate');
+    g.tick(3100); assert.strictEqual(g.phase, 'hunt'); assert.strictEqual(g.baseline, 75);
+});
+
+test('the summary carries a pulse timeline and blink times', () => {
+    const g = hunting(); g.tick(1000); g.onPulse(80); g.tick(300); g.onBlink(g.elapsedMs);
+    const s = g.summary();
+    assert.strictEqual(s.timeline.length, 1); assert.strictEqual(s.moves.length, 1);
 });

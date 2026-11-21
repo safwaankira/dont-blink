@@ -40,7 +40,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid #ffd27a; outline-
 .ro { background: rgba(10,8,7,0.7); border: 1px solid #2a231b; border-radius: 7px; padding: 6px 8px; }
 .ro-v { display: block; font-size: 24px; font-variant-numeric: tabular-nums; color: #f2e6cf; }
 .ro-l { font-size: 10.5px; color: #8d8473; letter-spacing: 0.05em; }
-#strip { position: absolute; left: 20px; bottom: 20px; width: 420px; height: 60px; opacity: 0.85; }
+#strip { position: absolute; left: 20px; bottom: 20px; background: rgba(10,8,7,0.55); border: 1px solid #2a231b; border-radius: 7px; width: 420px; height: 60px; opacity: 0.85; }
 #smile-meter { position: absolute; right: 20px; bottom: 22px; width: 200px; height: 22px; border: 1px solid #3a2d22; border-radius: 99px; overflow: hidden; background: rgba(10,8,7,0.7); }
 #smile-fill { height: 100%; width: 0; background: linear-gradient(90deg, #6b5a2a, #e0c06a); transition: width 120ms linear; }
 #smile-meter span { position: absolute; inset: 0; font-size: 11px; display: flex; align-items: center; justify-content: center; color: #e8dcc2; letter-spacing: 0.05em; }
