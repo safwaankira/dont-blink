@@ -298,6 +298,11 @@ function drawCard(c, s, how) {
         const lx = Math.min(xOf(peak.t) + 10, X1 - 90);
         g.fillText(`peak ${Math.round(peak.bpm)}`, lx, Math.max(Y0 + 4, yOf(peak.bpm) - 10));
     }
+    if (pts.length < 2) {
+        g.fillStyle = '#a89a80'; g.font = 'italic 20px Georgia, serif'; g.textAlign = 'center';
+        g.fillText('No pulse reading this round. Light your face from the front and try again.', (X0 + X1) / 2, (Y0 + Y1) / 2);
+        g.textAlign = 'left';
+    }
     g.fillStyle = '#7d7466'; g.font = '14px sans-serif';
     g.fillText('pulse during the round  ·  ticks = blinks', X0, Y1 + 26);
     g.textAlign = 'right';
