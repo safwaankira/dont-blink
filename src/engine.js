@@ -10,7 +10,8 @@
 const DEFAULTS = Object.freeze({
     roundSeconds: 60,       // survive this long and dawn breaks
     startDistance: 100,     // 100 = end of the hall, 0 = it has you
-    blinkStep: 6,           // metres the creature covers per blink at calm pulse
+    blinkStep: 4,           // metres the creature covers per blink at calm pulse
+    baselineSettleMs: 12000, // keep refining the resting pulse this long into the hunt
     maxPulseBoost: 1.0,     // +100% step when pulse is far above your baseline
     pulseSpan: 20,          // BPM above baseline that reaches the full boost
     pulseDeadZone: 3,       // ignore small wobble around your resting pulse
@@ -86,6 +87,11 @@ class Game {
         if (this.phase === 'calibrate') this.calPulse.push(bpm);
         if (this.phase === 'hunt') {
             this.pulseSamples.push(bpm);
+            // The first reading often comes right after you sit down and runs high.
+            // Refine the resting pulse from everything seen in the first seconds.
+            if (this.huntMs <= this.cfg.baselineSettleMs) {
+                this.baseline = median(this.calPulse.concat(this.pulseSamples));
+            }
             this.timeline.push({ t: this.huntMs, bpm });
             this.peakPulse = this.peakPulse == null ? bpm : Math.max(this.peakPulse, bpm);
         }

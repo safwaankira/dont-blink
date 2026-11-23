@@ -24,12 +24,12 @@ test('calibration gives up waiting after 30 s', () => {
 
 test('a blink moves it one step at a calm pulse', () => {
     const g = hunting(); g.tick(300); g.onBlink(g.elapsedMs);
-    assert.strictEqual(g.distance, 94);
+    assert.strictEqual(g.distance, 96);
 });
 
 test('a racing pulse doubles the step', () => {
-    const g = hunting(); g.onPulse(72 + 25); g.tick(300); g.onBlink(g.elapsedMs);
-    assert.strictEqual(g.distance, 88);
+    const g = hunting(); g.tick(13000); g.onPulse(72 + 25); g.tick(300); g.onBlink(g.elapsedMs);
+    assert.strictEqual(g.distance, 92);
 });
 
 test('one physical blink seen in several packets counts once', () => {
@@ -60,7 +60,7 @@ test('talking lets it creep', () => {
 
 test('enough blinks and it gets you', () => {
     const g = hunting();
-    for (let i = 0; i < 17 && g.phase === 'hunt'; i++) { g.tick(300); g.onBlink(g.elapsedMs); }
+    for (let i = 0; i < 30 && g.phase === 'hunt'; i++) { g.tick(300); g.onBlink(g.elapsedMs); }
     assert.strictEqual(g.phase, 'caught');
     assert.strictEqual(g.summary().outcome, 'caught');
 });
@@ -86,4 +86,14 @@ test('the summary carries a pulse timeline and blink times', () => {
     const g = hunting(); g.tick(1000); g.onPulse(80); g.tick(300); g.onBlink(g.elapsedMs);
     const s = g.summary();
     assert.strictEqual(s.timeline.length, 1); assert.strictEqual(s.moves.length, 1);
+});
+
+test('a high first reading settles toward the real resting pulse', () => {
+    const g = new Game();
+    g.onPulse(92); g.tick(300); g.onBlink(g.elapsedMs); g.tick(300); g.onBlink(g.elapsedMs); g.tick(16);
+    assert.strictEqual(g.baseline, 92);
+    for (const p of [78, 76, 77, 75]) { g.tick(1500); g.onPulse(p); }
+    assert.strictEqual(g.baseline, 77);
+    g.tick(12000); g.onPulse(110);
+    assert.strictEqual(g.baseline, 77, 'stops refining after the settle window');
 });

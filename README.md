@@ -9,7 +9,7 @@ Entry for the [DEV Presage SmartSpectra SDK Challenge](https://dev.to/challenges
 | Your signal (SmartSpectra metric) | What it does in the game |
 | --- | --- |
 | Blink (`face.blinking`, rising edge) | The screen cuts to black, and the creature is closer and in a new pose when your eyes open. |
-| Pulse rate (`cardio.pulseRate`) | Your resting pulse is measured while you light the candle. Above it, each blink moves the creature up to 2x farther. |
+| Pulse rate (`cardio.pulseRate`) | Your resting pulse is measured while you light the candle. Above it (refined over the first seconds of the hunt), each blink moves the creature up to 2x farther. |
 | Pulse wave (`cardio.arterialPressureTrace`) | Each detected heartbeat plays a "lub-dub" and pulses red at the edges, louder as it nears. |
 | Smile (`face.expression`, HAPPY confidence) | Hold a real smile for about a second and it flinches back 9 m (6 s cooldown). |
 | Talking (`face.talking`) | It hears you and creeps forward while you talk. |
@@ -48,7 +48,7 @@ If `npm start` exits silently from a VS Code terminal, unset `ELECTRON_RUN_AS_NO
 - `src/signals.js` turns each windowed `metrics` packet into game inputs: blink rising edges across packets, heartbeat peaks from the pressure trace, HAPPY confidence from expression scores.
 - `src/engine.js` holds the rules as pure logic, so the same code runs on live signals, practice keys and tests.
 - `src/view.js` draws the hallway, candle and creature on a canvas and makes every sound with Web Audio. No image or audio files.
-- `npm test` runs 18 tests on the rules and the signal parsing (CI runs them on every push).
+- `npm test` runs 19 tests on the rules and the signal parsing (CI runs them on every push).
 
 ## License
 
