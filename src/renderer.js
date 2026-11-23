@@ -50,6 +50,9 @@ let running = false;
 let last = performance.now();
 const strip = { pulse: [], breath: [] };
 let smileNow = 0;
+let roundId = 0;          // bumps on every new round or quit, so stale timers do nothing
+let stepTimer = null;     // a late footstep, still on its way
+let lastStepMissing = false;
 
 // ---------- signal handlers shared by live and practice ----------
 const reader = new SignalReader({
@@ -61,7 +64,7 @@ const reader = new SignalReader({
     },
     talking: (t) => game.onTalking(t),
     expression: ({ happy }) => { smileNow = happy; game.onSmile(happy, game.elapsedMs); },
-    beat: () => { scene.beatFlash = 1; sound.thump(1 - game.distance / 100); },
+    beat: () => { if (scene.capT != null) return; scene.beatFlash = 1; sound.thump(1 - game.distance / 100); },
     trace: (v) => push(strip.pulse, v),
     breath: (b) => { scene.breath = b; push(strip.breath, b); },
     breathRate: (r) => { $('ro-breath').textContent = Math.round(r); },
@@ -159,7 +162,9 @@ window.addEventListener('keyup', (e) => {
 function beginRound() {
     sound.start();
     game = new Game();
-    scene.candle = 0; scene.scare = 0; scene.settled = false; scene.dawn = 0; scene.shownDistance = 100; scene.gentle = $('opt-gentle').checked; scene.live = mode === 'live'; scene.lidLen = 260;
+    roundId++; clearTimeout(stepTimer); lastStepMissing = false;
+    scene.reset();
+    scene.candle = 0; scene.gentle = $('opt-gentle').checked; scene.live = mode === 'live'; scene.lidLen = 260;
     $('consent').hidden = true; $('end').hidden = true; $('error').hidden = true;
     $('hud').hidden = false; $('calib').hidden = false;
     $('ro-blinks').textContent = '0'; $('ro-dist').textContent = '100';
@@ -175,26 +180,43 @@ function handleEvents() {
     for (const ev of game.drain()) {
         if (ev.type === 'candle') { scene.candle = Math.min(2, ev.lit); if (ev.lit <= 2) sound.chime(); }
         if (ev.type === 'hunt') { $('calib').hidden = true; toast('Keep your eyes open.'); }
-        if (ev.type === 'moved') { scene.moved(1 - ev.to / 100); sound.step(1 - ev.to / 100); }
+        if (ev.type === 'moved') { scene.moved(1 - ev.to / 100); footstep(1 - ev.to / 100, ev.to); }
         if (ev.type === 'recoil') { scene.recoil = 1; sound.hiss(); toast('It flinched.'); }
         if (ev.type === 'caught') caught(ev);
         if (ev.type === 'dawn') dawn(ev);
     }
 }
 
+// Footsteps don't always land when it moves: some come late, some never come.
+function footstep(closeness, to) {
+    clearTimeout(stepTimer);
+    if (to <= 0) return; // the last one is the hand on the candle
+    const r = Math.random();
+    if (r < 0.15 && !lastStepMissing) { lastStepMissing = true; return; }
+    lastStepMissing = false;
+    if (r < 0.75) { sound.step(closeness); return; }
+    const round = roundId;
+    stepTimer = setTimeout(() => { if (round === roundId && running) sound.step(closeness); }, scene.lidLen + 250 + Math.random() * 200);
+}
+
+// Caught. A hand over the candle (0-220 ms), black and silence (400-1000), then
+// the same face lunges from below (1000-1450), hard cut, the end card at 1750.
+// Gentle mode keeps the snuffed candle and the black, and skips the face and scream.
 function caught(summary) {
     running = false;
     $('hud').hidden = true;
-    if (!scene.gentle) sound.scream();
-    const t0 = performance.now();
-    const anim = () => {
-        scene.scare = Math.min(1, (performance.now() - t0) / 250);
-        if (performance.now() - t0 < 1400) requestAnimationFrame(anim); else showEnd(summary);
-    };
-    anim();
+    clearTimeout(stepTimer);
+    const round = roundId, gentle = scene.gentle;
+    const at = (ms, fn) => setTimeout(() => { if (round === roundId) fn(); }, ms);
+    scene.startCapture();
+    sound.setDread(0, true); sound.whoosh();
+    at(190, () => sound.snuff());
+    at(300, () => sound.silence());
+    if (!gentle) at(1020, () => { sound.unsilence(); sound.scream(); });
+    at(gentle ? 1250 : 1750, () => showEnd(summary));
 }
 
-function dawn(summary) { running = false; $('hud').hidden = true; sound.dawn(); toast('Dawn.'); setTimeout(() => showEnd(summary), 3200); }
+function dawn(summary) { clearTimeout(stepTimer); running = false; $('hud').hidden = true; sound.dawn(); toast('Dawn.'); setTimeout(() => showEnd(summary), 3200); }
 
 function showEnd(s) {
     scene.settled = true;
@@ -204,7 +226,7 @@ function showEnd(s) {
 }
 
 function quit() {
-    running = false; stopLive();
+    running = false; stopLive(); roundId++; clearTimeout(stepTimer); sound.unsilence();
     $('hud').hidden = true; $('calib').hidden = true; $('end').hidden = true; $('error').hidden = true;
     $('consent').hidden = false;
 }
@@ -237,7 +259,7 @@ function drawStrip() {
         let lo = Infinity, hi = -Infinity; for (const v of arr) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
         const span = norm ? 2 : (hi - lo || 1), base = norm ? -1 : lo;
         g.beginPath(); g.strokeStyle = color; g.lineWidth = 1.5;
-        arr.forEach((v, i) => { const x = (i / 239) * w, y = h - 4 - ((v - base) / span) * (h - 8); i ? g.lineTo(x, y) : g.moveTo(x, y); });
+        arr.forEach((v, i) => { const x = (i / 239) * w, y = h - 4 - ((v - base) / span) * (h - 26); i ? g.lineTo(x, y) : g.moveTo(x, y); });
         g.stroke();
     };
     line(strip.breath, 'rgba(224,192,106,0.8)', true);
