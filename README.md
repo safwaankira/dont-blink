@@ -13,7 +13,6 @@ Entry for the [DEV Presage SmartSpectra SDK Challenge](https://dev.to/challenges
 | Pulse wave (`cardio.arterialPressureTrace`) | Each detected heartbeat plays a "lub-dub" and pulses red at the edges, louder as it nears. |
 | Smile (`face.expression`, HAPPY confidence) | Hold a real smile for about a second and it flinches back 9 m (6 s cooldown). |
 | Talking (`face.talking`) | It hears you and creeps forward while you talk. |
-| Breathing (`breathing.upperTrace`, `breathing.rate`) | The candle flame sways with your chest. |
 
 Calibration doubles as the tutorial: you light the candle by blinking twice, which proves the blink signal works for you before the hunt starts.
 
@@ -30,7 +29,7 @@ npm start
 
 No key yet? Leave `.env` empty and either paste a key on the start screen, or press **Practice with keys** to play with simulated signals (Space = blink, hold S = smile, arrow keys = pulse). Practice mode is clearly labelled on screen and on the end card; it never pretends to be live.
 
-Tips for a good reading: sit 40–70 cm from the camera, face it, and light your face from the front. If the SDK reports a framing or lighting problem, the hint shows top-left.
+Tips for a good reading: lean back so your shoulders and upper chest are in view, light your face from the front, and sit still for the first ~12 seconds (SmartSpectra's pulse window) while you light the candle. If the SDK reports a framing or lighting problem, the hint shows top-left.
 
 If `npm start` exits silently from a VS Code terminal, unset `ELECTRON_RUN_AS_NODE` first.
 
