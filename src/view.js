@@ -288,7 +288,7 @@ class Scene {
         function lerp2(a, b, m) { return { t: lerp(a.t, b.t, m), b: lerp(a.b, b.b, m) }; }
     }
 
-    moved(closeness) { this.lid = 260; this.pendingPose = true; this.shake = 6 + 22 * closeness * closeness; }
+    moved(closeness) { this.lidLen = this.live ? 170 : 260; this.lid = this.lidLen; this.pendingPose = true; this.shake = closeness > 0.6 ? 22 * closeness * closeness : 0; }
 
     draw(dt, state) {
         const { g, w, h, cx } = this;
@@ -298,7 +298,7 @@ class Scene {
         this.shake = Math.max(0, this.shake - dt / 20);
         if (this.lid > 0) {
             this.lid = Math.max(0, this.lid - dt);
-            if (this.pendingPose && this.lid < 160) { this.pose = (Math.random() * 1e9) | 0; this.pendingPose = false; this.shownDistance = state.distance; }
+            if (this.pendingPose && this.lid < this.lidLen - (this.live ? 0 : 100)) { this.pose = (Math.random() * 1e9) | 0; this.pendingPose = false; this.shownDistance = state.distance; }
         } else this.shownDistance += (state.distance - this.shownDistance) * Math.min(1, dt / 150);
         if (state.phase === 'dawn') this.dawn = Math.min(1, this.dawn + dt / 3000);
 
@@ -359,8 +359,11 @@ class Scene {
     // Eyelids: close fast, hold, open — the pose changes while they're shut.
     drawLids() {
         if (this.lid <= 0) return;
-        const g = this.g, { w, h } = this, t = 1 - this.lid / 260; // 0..1
-        const shut = t < 0.25 ? t / 0.25 : t < 0.55 ? 1 : 1 - (t - 0.55) / 0.45;
+        const g = this.g, { w, h } = this, t = 1 - this.lid / this.lidLen; // 0..1
+        // Live: your real eyes were the shutter, so cut straight to black and only
+        // animate the reopening. Practice: draw the full close and open.
+        const shut = this.live ? (t < 0.35 ? 1 : 1 - (t - 0.35) / 0.65)
+            : (t < 0.25 ? t / 0.25 : t < 0.55 ? 1 : 1 - (t - 0.55) / 0.45);
         const e = shut * shut * (3 - 2 * shut);
         const half = h / 2 * e + 2;
         g.fillStyle = '#000';

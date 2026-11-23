@@ -139,7 +139,7 @@ window.addEventListener('keyup', (e) => {
 function beginRound() {
     sound.start();
     game = new Game();
-    scene.candle = 0; scene.scare = 0; scene.settled = false; scene.dawn = 0; scene.shownDistance = 100; scene.gentle = $('opt-gentle').checked;
+    scene.candle = 0; scene.scare = 0; scene.settled = false; scene.dawn = 0; scene.shownDistance = 100; scene.gentle = $('opt-gentle').checked; scene.live = mode === 'live'; scene.lidLen = 260;
     $('consent').hidden = true; $('end').hidden = true; $('error').hidden = true;
     $('hud').hidden = false; $('calib').hidden = false;
     $('ro-blinks').textContent = '0'; $('ro-dist').textContent = '100';
