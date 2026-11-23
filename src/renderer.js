@@ -216,7 +216,7 @@ function caught(summary) {
     at(gentle ? 1250 : 1750, () => showEnd(summary));
 }
 
-function dawn(summary) { clearTimeout(stepTimer); running = false; $('hud').hidden = true; sound.dawn(); toast('Dawn.'); setTimeout(() => showEnd(summary), 3200); }
+function dawn(summary) { clearTimeout(stepTimer); running = false; $('hud').hidden = true; sound.dawn(); toast('Dawn.'); const round = roundId; setTimeout(() => { if (round === roundId) showEnd(summary); }, 3200); }
 
 function showEnd(s) {
     scene.settled = true;
@@ -226,7 +226,7 @@ function showEnd(s) {
 }
 
 function quit() {
-    running = false; stopLive(); roundId++; clearTimeout(stepTimer); sound.unsilence();
+    running = false; stopLive(); roundId++; clearTimeout(stepTimer); scene.reset(); sound.setDread(0, true); sound.unsilence();
     $('hud').hidden = true; $('calib').hidden = true; $('end').hidden = true; $('error').hidden = true;
     $('consent').hidden = false;
 }
@@ -277,7 +277,7 @@ function frame(now) {
         const left = Math.max(0, game.cfg.roundSeconds - game.huntMs / 1000);
         $('dawn-time').textContent = `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`;
         $('ro-dist').textContent = Math.round(game.distance);
-        sound.setDread(1 - game.distance / 100);
+        if (running) sound.setDread(1 - game.distance / 100); // caught/dawn may have ended the round this frame
         const cd = game.smileCooldownLeft();
         $('smile-fill').style.width = cd > 0 ? `${100 * (1 - cd / game.cfg.smileCooldownMs)}%` : `${Math.min(100, smileNow)}%`;
         if (game.phase === 'calibrate') $('calib-status').textContent = calibText();

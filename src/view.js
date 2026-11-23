@@ -577,6 +577,7 @@ class Scene {
     // A blink happened. Decide now how it will look when the eyes reopen.
     moved(closeness) {
         const to = 100 * (1 - closeness);
+        if (to <= 0) { this.shownDistance = 0; this.hold = false; this.pendingPose = false; this.lid = 0; return; } // the capture takes over
         this.lidLen = this.live ? 170 : 260; this.lid = this.lidLen; this.pendingPose = true;
         const r = Math.random();
         let kind = r < 0.42 ? 'advance' : r < 0.62 ? 'lateral' : r < 0.8 ? 'head' : 'arm';
