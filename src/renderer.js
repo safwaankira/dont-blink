@@ -25,6 +25,7 @@ if (!apiKey) $('key-row').hidden = false;
 // Camera hints in the game's voice. Chest framing only affects the breathing
 // trace (the candle sway), so it is never worth interrupting play for.
 const HINTS = {
+    [ValidationCode.kChestNotVisible]: 'Sit back a little so your shoulders show.',
     [ValidationCode.kNoFaceFound]: "It can't see your face.",
     [ValidationCode.kMultipleFacesFound]: 'Only one of you can play.',
     [ValidationCode.kFaceNotCentered]: 'Sit in the middle of the camera.',
@@ -77,7 +78,9 @@ async function startLive() {
     beginRound();
     sdk = new SmartSpectraSDK({
         apiKey,
-        requestedMetrics: [...breathingMetrics, ...cardioMetrics, ...faceMetrics],
+        // Breathing metrics need the chest in frame; without them the SDK only
+        // needs your face, which is how people sit at a laptop.
+        requestedMetrics: [...cardioMetrics, ...faceMetrics],
         enableAccumulatedOutput: false,
         enableTelemetry: $('opt-telemetry').checked,
     });
@@ -220,7 +223,7 @@ function toast(text) {
 
 function calibText() {
     if (mode === 'live' && !gotMetrics) return 'Waking the camera…';
-    const pulse = game.pulse != null ? `Pulse ${Math.round(game.pulse)} bpm. ` : (mode === 'live' ? 'Finding your pulse… ' : '');
+    const pulse = game.pulse != null ? `Pulse ${Math.round(game.pulse)} bpm. ` : (mode === 'live' ? 'Sit still: reading your pulse (about 12 s). ' : '');
     const nudge = game.calBlinks < 2 && game.elapsedMs > 9000 ? ' Blink slowly and fully.' : '';
     const press = mode === 'practice' && game.calBlinks < 2 ? ' Press Space to blink.' : '';
     return `${pulse}Blinks ${Math.min(2, game.calBlinks)} of 2.${press}${nudge}`;

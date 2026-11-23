@@ -138,10 +138,11 @@ class Game {
         this.elapsedMs += dtMs;
         if (this.phase === 'calibrate') {
             // Start as soon as both candles are lit and we have any pulse; if the
-            // pulse is slow to arrive, wait at most 4 s more, then use a default.
+            // pulse is slow to arrive (SmartSpectra needs a ~12 s window), wait up to
+            // 14 s more, then use a default.
             const lit = this.calBlinks >= 2;
-            const waited = lit && this.elapsedMs - this.secondBlinkAt > 4000;
-            if ((lit && (this.calPulse.length >= 1 || waited)) || this.elapsedMs > 20000) this.startHunt();
+            const waited = lit && this.elapsedMs - this.secondBlinkAt > 14000;
+            if ((lit && (this.calPulse.length >= 1 || waited)) || this.elapsedMs > 30000) this.startHunt();
             return;
         }
         if (this.phase !== 'hunt') return;
