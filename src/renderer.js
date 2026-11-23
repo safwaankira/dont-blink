@@ -17,6 +17,8 @@ const $ = (id) => document.getElementById(id);
 // --- API key: from the main process (env / .env) via the query string, else typed in.
 const params = new URLSearchParams(location.search);
 let apiKey = params.get('k') || '';
+const DEBUG = params.get('d') === '1';
+const dbg = { packets: 0, pulse: 0, pulseVals: [], breath: 0, blinks: 0, codes: {}, last: 0 };
 if (params.has('k')) history.replaceState(null, '', location.pathname); // don't keep it in the URL
 if (!apiKey) $('key-row').hidden = false;
 
@@ -81,13 +83,28 @@ async function startLive() {
     });
     sdk.on('metrics', (buf) => {
         gotMetrics = true;
-        try { reader.feed(decodeMetrics(buf)); } catch (e) { console.error('[dont-blink] decode failed', e); }
+        try {
+            const m = decodeMetrics(buf);
+            if (DEBUG) {
+                dbg.packets++;
+                const pr = m.cardio?.pulseRate || [];
+                dbg.pulse += pr.length; pr.slice(-2).forEach((p) => dbg.pulseVals.push(`${Number(p.value).toFixed(1)}@${Number(p.confidence ?? -1).toFixed(2)}`));
+                dbg.breath += (m.breathing?.rate || []).length; dbg.blinks += (m.face?.blinking || []).length;
+                const now = performance.now();
+                if (now - dbg.last > 3000) {
+                    dbg.last = now;
+                    console.log(`[dont-blink] packets=${dbg.packets} pulseSamples=${dbg.pulse} last=${dbg.pulseVals.slice(-4).join(',')} breathSamples=${dbg.breath} blinkSamples=${dbg.blinks} cardioKeys=${Object.keys(m.cardio || {}).join('|')} codes=${JSON.stringify(dbg.codes)}`);
+                }
+            }
+            reader.feed(m);
+        } catch (e) { console.error('[dont-blink] decode failed', e); }
     });
     sdk.on('validationStatus', (code, _ts, hint) => {
         $('hint').textContent = HINTS[code] || '';
+        if (DEBUG) dbg.codes[code] = (dbg.codes[code] || 0) + 1;
     });
     sdk.on('processingStatus', (s) => { if (s === ProcessingStatus.kError) showError('The SDK stopped. Check the light and your key, then try again.'); });
-    sdk.on('error', (code, message) => showError(`SmartSpectra error ${code}: ${message}`));
+    sdk.on('error', (code, message) => (DEBUG && console.log(`[dont-blink] sdk error ${code} ${message}`), showError)(`SmartSpectra error ${code}: ${message}`));
     sdk.on('streamAvailable', (stream) => { $('preview').srcObject = stream; $('preview').play().catch(() => {}); });
     try { await sdk.start(); } catch (err) { showError(err.message || String(err)); }
 }
@@ -206,7 +223,7 @@ function calibText() {
     const pulse = game.pulse != null ? `Pulse ${Math.round(game.pulse)} bpm. ` : (mode === 'live' ? 'Finding your pulse… ' : '');
     const nudge = game.calBlinks < 2 && game.elapsedMs > 9000 ? ' Blink slowly and fully.' : '';
     const press = mode === 'practice' && game.calBlinks < 2 ? ' Press Space to blink.' : '';
-    return `${pulse}Candle ${Math.min(2, game.calBlinks)}/2.${press}${nudge}`;
+    return `${pulse}Blinks ${Math.min(2, game.calBlinks)} of 2.${press}${nudge}`;
 }
 
 function drawStrip() {

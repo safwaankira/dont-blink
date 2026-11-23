@@ -102,7 +102,16 @@ function createWindow() {
     // The key travels as a query param of a local file:// URL; the page reads
     // it once and strips it from the URL with history.replaceState.
     const key = readApiKey();
-    win.loadFile(path.join(__dirname, 'index.html'), { query: key ? { k: key } : {} });
+    const query = key ? { k: key } : {};
+    if (process.env.DONTBLINK_DEBUG === '1') {
+        query.d = '1';
+        // Print the page's console lines in the terminal so a player can paste them.
+        win.webContents.on('console-message', (e, _level, message) => {
+            const msg = e?.message ?? message;
+            if (String(msg).startsWith('[dont-blink]')) console.log(msg);
+        });
+    }
+    win.loadFile(path.join(__dirname, 'index.html'), { query });
     win.setMenuBarVisibility(false);
     win.webContents.on('before-input-event', (_e, input) => {
         if (input.type === 'keyDown' && input.key === 'F11') win.setFullScreen(!win.isFullScreen());
